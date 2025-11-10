@@ -21,7 +21,6 @@ O projeto combina **hardware industrial** (placa DBX MIO Flex, Arduino/ESP32) co
 - 🏢 **Gerenciamento de salas** (cadastro, edição, exclusão e configuração)
 - 👥 **Gestão de usuários** (cadastro, permissões e acompanhamento)
 - 📅 **Sistema de reservas** com calendário interativo e grade horária
-- 🔔 **Sistema de alertas** e notificações
 - 📈 **Relatórios e analytics** de uso e economia de energia
 - 🛠️ **Controle de equipamentos** e relés via MQTT
 - 🔍 **Logs de acesso** e auditoria
