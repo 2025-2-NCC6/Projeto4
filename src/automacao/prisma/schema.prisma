@@ -1,0 +1,289 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model acao_equipamento {
+  id             BigInt                      @id @default(autoincrement())
+  equipamento_id Int
+  comando        String                      @db.VarChar(50)
+  origem         acao_equipamento_origem?    @default(manual)
+  resultado      acao_equipamento_resultado? @default(pendente)
+  timestamp      DateTime?                   @default(now()) @db.DateTime(0)
+  equipamento    equipamento                 @relation(fields: [equipamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "acao_equipamento_ibfk_1")
+
+  @@index([equipamento_id], map: "equipamento_id")
+}
+
+model acesso_sala {
+  id         BigInt           @id @default(autoincrement())
+  usuario_id Int
+  sala_id    Int
+  tipo       acesso_sala_tipo
+  timestamp  DateTime?        @default(now()) @db.DateTime(0)
+  usuario    usuario          @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "acesso_sala_ibfk_1")
+  sala       sala             @relation(fields: [sala_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "acesso_sala_ibfk_2")
+
+  @@index([sala_id], map: "sala_id")
+  @@index([usuario_id], map: "usuario_id")
+}
+
+model equipamento {
+  id               Int                       @id @default(autoincrement())
+  sala_id          Int
+  nome             String                    @db.VarChar(100)
+  tipo             equipamento_tipo
+  identificador    String?                   @db.VarChar(50)
+  relay_id         Int?
+  protocolo        equipamento_protocolo?    @default(UDP)
+  endereco         String?                   @db.VarChar(100)
+  status           equipamento_status?       @default(ativo)
+  meta_json        Json?
+  ativo            Boolean?                  @default(true)
+  acao_equipamento acao_equipamento[]
+  sala             sala                      @relation(fields: [sala_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipamento_ibfk_1")
+  leitura_sensor   leitura_sensor[]
+
+  @@index([sala_id], map: "sala_id")
+}
+
+model leitura_sensor {
+  id             BigInt      @id @default(autoincrement())
+  equipamento_id Int
+  timestamp      DateTime?   @default(now()) @db.DateTime(0)
+  dados_json     Json
+  equipamento    equipamento @relation(fields: [equipamento_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "leitura_sensor_ibfk_1")
+
+  @@index([equipamento_id, timestamp], map: "idx_sensor_equip")
+}
+
+model log_sistema {
+  id        BigInt             @id @default(autoincrement())
+  nivel     log_sistema_nivel? @default(info)
+  origem    String?            @db.VarChar(100)
+  mensagem  String?            @db.Text
+  criado_em DateTime?          @default(now()) @db.DateTime(0)
+}
+
+model problema_reportado {
+  id              Int                       @id @default(autoincrement())
+  usuario_id      Int
+  sala_id         Int
+  tipo_problema   String                    @db.VarChar(100)
+  descricao       String                    @db.Text
+  status          problema_status?          @default(pendente)
+  data_registro   DateTime?                 @default(now()) @db.DateTime(0)
+  data_resolucao  DateTime?                 @db.DateTime(0)
+  observacoes_adm String?                   @db.Text
+  usuario         usuario                   @relation(fields: [usuario_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "problema_reportado_ibfk_1")
+  sala            sala                      @relation(fields: [sala_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "problema_reportado_ibfk_2")
+
+  @@index([usuario_id], map: "usuario_id")
+  @@index([sala_id], map: "sala_id")
+  @@index([status], map: "status")
+}
+
+model sala {
+  id                    Int                   @id @default(autoincrement())
+  nome                  String                @db.VarChar(100)
+  tipo                  sala_tipo?            @default(aula)
+  predio                sala_predio?          @default(A)
+  capacidade            Int?                  @default(40)
+  andar                 Int?
+  area_m2               Float?
+  patrocinada           Boolean?              @default(false)
+  empresa_patrocinadora String?               @db.VarChar(100)
+  observacoes           String?               @db.Text
+  status                sala_status?          @default(ativa)
+  criado_em             DateTime?             @default(now()) @db.DateTime(0)
+  acesso_sala           acesso_sala[]
+  equipamento           equipamento[]
+  reserva               reserva[]
+  solicitacao_reserva   solicitacao_reserva[]
+  problema_reportado    problema_reportado[]
+}
+
+model usuario {
+  id                                                            Int                   @id @default(autoincrement())
+  nome                                                          String                @db.VarChar(100)
+  email                                                         String?               @db.VarChar(120)
+  tipo                                                          usuario_tipo?         @default(professor)
+  tag_uid                                                       String?               @unique(map: "tag_uid") @db.VarChar(50)
+  ativo                                                         Boolean?              @default(true)
+  criado_em                                                     DateTime?             @default(now()) @db.DateTime(0)
+  acesso_sala                                                   acesso_sala[]
+  reserva                                                       reserva[]
+  solicitacao_reserva_solicitacao_reserva_usuario_idTousuario   solicitacao_reserva[] @relation("solicitacao_reserva_usuario_idTousuario")
+  solicitacao_reserva_solicitacao_reserva_aprovado_porTousuario solicitacao_reserva[] @relation("solicitacao_reserva_aprovado_porTousuario")
+  problema_reportado                                            problema_reportado[]
+}
+
+model reserva {
+  id          Int                 @id @default(autoincrement())
+  sala_id     Int
+  usuario_id  Int
+  tipo        reserva_tipo?       @default(fixa)
+  dia_semana  reserva_dia_semana?
+  hora_inicio DateTime            @db.Time(0)
+  hora_fim    DateTime            @db.Time(0)
+  data_inicio DateTime?           @db.Date
+  data_fim    DateTime?           @db.Date
+  curso       String?             @db.VarChar(100)
+  disciplina  String?             @db.VarChar(100)
+  turma       String?             @db.VarChar(30)
+  categoria   reserva_categoria?  @default(aula)
+  status      reserva_status?     @default(ativa)
+  observacao  String?             @db.Text
+  criado_em   DateTime?           @default(now()) @db.DateTime(0)
+  sala        sala                @relation(fields: [sala_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reserva_ibfk_1")
+  usuario     usuario             @relation(fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "reserva_ibfk_2")
+
+  @@index([sala_id], map: "sala_id")
+  @@index([usuario_id], map: "usuario_id")
+}
+
+model solicitacao_reserva {
+  id                                                Int                         @id @default(autoincrement())
+  usuario_id                                        Int
+  sala_id                                           Int
+  motivo                                            String?                     @db.Text
+  data_inicio                                       DateTime                    @db.Date
+  data_fim                                          DateTime                    @db.Date
+  hora_inicio                                       DateTime                    @db.Time(0)
+  hora_fim                                          DateTime                    @db.Time(0)
+  status                                            solicitacao_reserva_status? @default(pendente)
+  observacao                                        String?                     @db.Text
+  criado_em                                         DateTime?                   @default(now()) @db.DateTime(0)
+  aprovado_por                                      Int?
+  aprovado_em                                       DateTime?                   @db.DateTime(0)
+  usuario_solicitacao_reserva_usuario_idTousuario   usuario                     @relation("solicitacao_reserva_usuario_idTousuario", fields: [usuario_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "solicitacao_reserva_ibfk_1")
+  sala                                              sala                        @relation(fields: [sala_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "solicitacao_reserva_ibfk_2")
+  usuario_solicitacao_reserva_aprovado_porTousuario usuario?                    @relation("solicitacao_reserva_aprovado_porTousuario", fields: [aprovado_por], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "solicitacao_reserva_ibfk_3")
+
+  @@index([aprovado_por], map: "aprovado_por")
+  @@index([sala_id], map: "sala_id")
+  @@index([usuario_id], map: "usuario_id")
+}
+
+enum log_sistema_nivel {
+  info
+  warn
+  error
+}
+
+enum usuario_tipo {
+  professor
+  tecnico
+  aluno
+  visitante
+}
+
+enum acao_equipamento_origem {
+  manual
+  automatica
+  rfid
+}
+
+enum acesso_sala_tipo {
+  entrada
+  saida
+}
+
+enum acao_equipamento_resultado {
+  sucesso
+  falha
+  pendente
+}
+
+enum equipamento_protocolo {
+  GPIO
+  UDP
+  HTTP
+  MQTT
+  OUTRO
+}
+
+enum sala_tipo {
+  aula
+  lab_info
+  lab_make
+  meet
+  teatro
+  outro
+}
+
+enum reserva_tipo {
+  fixa
+  temporaria
+  evento
+}
+
+enum sala_predio {
+  A
+  B
+  C
+  OUTRO
+}
+
+enum equipamento_tipo {
+  luz
+  projetor
+  computador
+  tomada
+  ar_condicionado
+  audio
+  rede
+  outro
+}
+
+enum equipamento_status {
+  ativo
+  inativo
+  manutencao
+}
+
+enum reserva_dia_semana {
+  seg
+  ter
+  qua
+  qui
+  sex
+  sab
+  dom
+}
+
+enum sala_status {
+  ativa
+  inativa
+  manutencao
+}
+
+enum solicitacao_reserva_status {
+  pendente
+  aprovada
+  recusada
+}
+
+enum reserva_categoria {
+  aula
+  reuniao
+  evento
+  manutencao
+}
+
+enum reserva_status {
+  ativa
+  cancelada
+  encerrada
+}
+
+enum problema_status {
+  pendente
+  em_analise
+  resolvido
+  rejeitado
+}
